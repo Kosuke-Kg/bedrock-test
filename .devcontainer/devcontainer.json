@@ -13,6 +13,13 @@
 				},
 				"[markdown]": {
 					"editor.defaultFormatter": "unifiedjs.vscode-remark"
+				},
+				"[python]": {
+					"editor.codeActionsOnSave": {
+						"source.fixAll": "explicit",
+						"source.organizeImports": "explicit"
+					},
+					"editor.defaultFormatter": "charliermarsh.ruff"
 				}
 			},
 			"extensions": [
@@ -29,7 +36,8 @@
 				"njpwerner.autodocstring",
 				"donjayamanne.python-environment-manager",
 				"esbenp.prettier-vscode",
-				"unifiedjs.vscode-remark"
+				"unifiedjs.vscode-remark",
+				"charliermarsh.ruff"
 			]
 		}
 	},
