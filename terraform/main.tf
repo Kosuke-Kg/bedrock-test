@@ -1,3 +1,12 @@
+terraform {
+  required_providers {
+    aws = {
+      source  = "hashicorp/aws"
+      version = "~> 5.0"
+    }
+  }
+}
+
 # AWSプロバイダー設定
 provider "aws" {
   region = "ap-northeast-1"
@@ -25,74 +34,31 @@ resource "aws_internet_gateway" "main" {
   }
 }
 
-resource "aws_subnet" "public-1a" {
+resource "aws_subnet" "public-subnet" {
+  count = length(local.availability_zones)
+
   vpc_id                  = aws_vpc.main.id
-  cidr_block              = "10.0.1.0/24"
-  availability_zone       = "ap-northeast-1a"
+  cidr_block              = local.public_subnet_cidrs[count.index]
+  availability_zone       = local.availability_zones[count.index]
   map_public_ip_on_launch = true
 
   tags = {
-    Name                   = "${local.project_name}-public-1a"
+    Name                   = "${local.project_name}-public-${substr(local.availability_zones[count.index], -2, 2)}"
     "${local.project_tag}" = local.project_name
-  }
-}
-
-resource "aws_subnet" "public-1c" {
-  vpc_id                  = aws_vpc.main.id
-  cidr_block              = "10.0.2.0/24"
-  availability_zone       = "ap-northeast-1c"
-  map_public_ip_on_launch = true
-
-  tags = {
-    Name                   = "${local.project_name}-public-1c"
-    "${local.project_tag}" = local.project_name
-  }
-}
-
-resource "aws_subnet" "public-1d" {
-  vpc_id                  = aws_vpc.main.id
-  cidr_block              = "10.0.3.0/24"
-  availability_zone       = "ap-northeast-1d"
-  map_public_ip_on_launch = true
-
-  tags = {
-    Name                   = "${local.project_name}-public-1d"
-    "${local.project_tag}" = local.project_name
+    Type                   = "public"
   }
 }
 
 # プライベートサブネット
-resource "aws_subnet" "private_1a" {
+resource "aws_subnet" "private-subnet" {
+  count = length(local.availability_zones)
+
   vpc_id            = aws_vpc.main.id
-  cidr_block        = "10.0.11.0/24"
-  availability_zone = "ap-northeast-1a"
+  cidr_block        = local.private_subnet_cidrs[count.index]
+  availability_zone = local.availability_zones[count.index]
 
   tags = {
-    Name                   = "${local.project_name}-private-1a"
-    "${local.project_tag}" = local.project_name
-    Type                   = "private"
-  }
-}
-
-resource "aws_subnet" "private_1c" {
-  vpc_id            = aws_vpc.main.id
-  cidr_block        = "10.0.12.0/24"
-  availability_zone = "ap-northeast-1c"
-
-  tags = {
-    Name                   = "${local.project_name}-private-1c"
-    "${local.project_tag}" = local.project_name
-    Type                   = "private"
-  }
-}
-
-resource "aws_subnet" "private_1d" {
-  vpc_id            = aws_vpc.main.id
-  cidr_block        = "10.0.13.0/24"
-  availability_zone = "ap-northeast-1d"
-
-  tags = {
-    Name                   = "${local.project_name}-private-1d"
+    Name                   = "${local.project_name}-private-${substr(local.availability_zones[count.index], -2, 2)}"
     "${local.project_tag}" = local.project_name
     Type                   = "private"
   }
