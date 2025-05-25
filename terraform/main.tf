@@ -63,3 +63,45 @@ resource "aws_subnet" "private-subnet" {
     Type                   = "private"
   }
 }
+
+# パブリックルートテーブル
+resource "aws_route_table" "public-route-table" {
+  vpc_id = aws_vpc.main.id
+
+  tags = {
+    Name                   = "${local.project_name}-public-route-table"
+    "${local.project_tag}" = local.project_name
+    Type                   = "public"
+  }
+}
+
+resource "aws_route" "public-route" {
+  route_table_id         = aws_route_table.public-route-table.id
+  destination_cidr_block = "0.0.0.0/0"
+  gateway_id             = aws_internet_gateway.main.id
+}
+
+resource "aws_route_table_association" "public-route-table-association" {
+  count = length(local.availability_zones)
+
+  subnet_id      = aws_subnet.public-subnet[count.index].id
+  route_table_id = aws_route_table.public-route-table.id
+}
+
+#　プライベートルートテーブル
+resource "aws_route_table" "private-route-table" {
+  vpc_id = aws_vpc.main.id
+
+  tags = {
+    Name                   = "${local.project_name}-private-route-table"
+    "${local.project_tag}" = local.project_name
+    Type                   = "private"
+  }
+}
+
+resource "aws_route_table_association" "private-route-table-association" {
+  count = length(local.availability_zones)
+
+  subnet_id      = aws_subnet.private-subnet[count.index].id
+  route_table_id = aws_route_table.private-route-table.id
+}
