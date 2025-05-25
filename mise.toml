@@ -1,0 +1,11 @@
+[tools]
+node = "22.16.0"
+npm = "10.9.2"
+
+python = "3.13.3"
+uv = "0.7.8"
+
+terraform = "1.12.1"
+terraform-docs = "0.20.0"
+tflint = "0.57.0"
+tfsec = "1.28.14"
