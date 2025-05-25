@@ -14,3 +14,13 @@ resource "aws_vpc" "main" {
     "${local.project_tag}"   = local.project_name
   }
 }
+
+# Internet Gateway作成
+resource "aws_internet_gateway" "main" {
+  vpc_id = aws_vpc.main.id
+
+  tags = {
+    Name                     = "${local.project_name}-igw"
+    "${local.project_tag}"   = local.project_name
+  }
+}
