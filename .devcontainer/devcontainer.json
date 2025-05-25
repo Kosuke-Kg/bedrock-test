@@ -1,0 +1,38 @@
+{
+	"name": "Ubuntu",
+	"build": {
+		"dockerfile": "Dockerfile"
+	},
+	"customizations": {
+		"vscode": {
+			"settings": {
+				"editor.formatOnSave": true,
+				"editor.defaultFormatter": "esbenp.prettier-vscode",
+				"[json][jsonc]": {
+					"editor.defaultFormatter": "vscode.json-language-features"
+				},
+				"[markdown]": {
+					"editor.defaultFormatter": "unifiedjs.vscode-remark"
+				}
+			},
+			"extensions": [
+				"GitHub.copilot",
+				"GitHub.copilot-chat",
+				"vscode-icons-team.vscode-icons",
+				"hediet.vscode-drawio",
+				"mhutchie.git-graph",
+				"oderwat.indent-rainbow",
+				"shardulm94.trailing-spaces",
+				"streetsidesoftware.code-spell-checker",
+				"hashicorp.terraform",
+				"ms-python.python",
+				"njpwerner.autodocstring",
+				"donjayamanne.python-environment-manager",
+				"esbenp.prettier-vscode",
+				"unifiedjs.vscode-remark"
+			]
+		}
+	},
+	"remoteUser": "vscode",
+	"postCreateCommand": "mise trust && mise i"
+}
