@@ -675,8 +675,6 @@ resource "aws_iam_role_policy" "ecs_task_policy" {
 }
 
 # ECS Task Definition
-
-# ECS Task Definition
 resource "aws_ecs_task_definition" "backend-api" {
   family                   = "${local.project_name}-api"
   network_mode             = "awsvpc"
