@@ -11,5 +11,5 @@ def hello_world() -> Dict[str, str]:
 
 
 @app.get("/health_check")
-def health_check():
+def health_check() -> Dict[str, str]:
     return {"status": "healthy"}
