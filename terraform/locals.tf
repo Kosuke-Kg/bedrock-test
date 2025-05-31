@@ -1,4 +1,7 @@
 locals {
+  # CIDR Block
+  cidr_block = "10.0.0.0/16"
+
   # projectのタグ
   project_tag  = "project"
   project_name = "bedrock-test"
