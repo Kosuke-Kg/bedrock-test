@@ -121,6 +121,46 @@ resource "aws_lb" "alb" {
   }
 }
 
+# ALBリスナー
+resource "aws_lb_listener" "alb-http-listener" {
+  load_balancer_arn = aws_lb.alb.arn
+  port              = 80
+  protocol          = "HTTP"
+
+  default_action {
+    type = "redirect"
+
+    redirect {
+      port        = "443"
+      protocol    = "HTTPS"
+      status_code = "HTTP_301"
+    }
+  }
+
+  tags = {
+    Name                   = "${local.project_name}-alb-listener"
+    "${local.project_tag}" = local.project_name
+  }
+}
+
+resource "aws_lb_listener" "alb-https-listener" {
+  load_balancer_arn = aws_lb.alb.arn
+  port              = "443"
+  protocol          = "HTTPS"
+  ssl_policy        = "ELBSecurityPolicy-TLS13-1-2-2021-06"
+  # certificate_arn   = aws_acm_certificate_validation.main.certificate_arn # FIXME: ACM証明書のARNを指定
+
+  default_action {
+    type             = "forward"
+    target_group_arn = aws_lb_target_group.ecs.arn
+  }
+
+  tags = {
+    Name                   = "${local.project_name}-alb-https-listener"
+    "${local.project_tag}" = local.project_name
+  }
+}
+
 # ALB Target Group
 resource "aws_lb_target_group" "ecs" {
   name        = "${local.project_name}-ecs-tg"
@@ -175,8 +215,6 @@ resource "aws_vpc_security_group_ingress_rule" "alb-sg-https" {
   cidr_ipv4         = "0.0.0.0/0"
 }
 
-
-
 resource "aws_vpc_security_group_egress_rule" "alb-sg-egress" {
   security_group_id            = aws_security_group.alb-sg.id
   from_port                    = 8000
@@ -184,7 +222,6 @@ resource "aws_vpc_security_group_egress_rule" "alb-sg-egress" {
   ip_protocol                  = "tcp"
   referenced_security_group_id = aws_security_group.backend-api-sg.id
 }
-
 
 
 # ECS Security group
