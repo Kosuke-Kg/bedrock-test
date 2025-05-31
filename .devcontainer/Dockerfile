@@ -1,4 +1,3 @@
-# 代替案：異なるUIDを使用するバージョン
 FROM ubuntu:24.10
 
 # 環境変数の設定
@@ -23,6 +22,7 @@ RUN apt-get update && apt-get install -y \
     jq \
     tree \
     htop \
+    tree \
     && rm -rf /var/lib/apt/lists/*
 
 # 開発用ユーザーの作成（UID 1001を使用）

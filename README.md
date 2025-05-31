@@ -25,5 +25,5 @@ uv sync
 pythonの仮想環境実行
 
 ```bash
-. ./venv/bin/activate
+. ./.venv/bin/activate
 ```
