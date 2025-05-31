@@ -121,6 +121,32 @@ resource "aws_lb" "alb" {
   }
 }
 
+# ALB Target Group
+resource "aws_lb_target_group" "ecs" {
+  name        = "${local.project_name}-ecs-tg"
+  port        = 8000
+  protocol    = "HTTP"
+  vpc_id      = aws_vpc.main.id
+  target_type = "ip"
+
+  health_check {
+    enabled             = true
+    healthy_threshold   = 2
+    unhealthy_threshold = 2
+    timeout             = 5
+    interval            = 30
+    path                = "/health_check"
+    matcher             = "200"
+    port                = "traffic-port"
+    protocol            = "HTTP"
+  }
+
+  tags = {
+    Name                   = "${local.project_name}-ecs-tg"
+    "${local.project_tag}" = local.project_name
+  }
+}
+
 # ALB security group
 resource "aws_security_group" "alb-sg" {
   name        = "${local.project_name}-alb-sg"

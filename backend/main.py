@@ -6,5 +6,10 @@ app = FastAPI()
 
 
 @app.get("/")
-def read_root() -> Dict[str, str]:
+def hello_world() -> Dict[str, str]:
     return {"Hello": "World"}
+
+
+@app.get("/health_check")
+def health_check():
+    return {"status": "healthy"}
