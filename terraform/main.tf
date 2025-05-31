@@ -321,3 +321,44 @@ resource "aws_vpc_security_group_egress_rule" "backend-api-sg-vpc-endpoint-egres
   ip_protocol       = "tcp"
   cidr_ipv4         = local.cidr_block
 }
+
+# ECR Repository
+resource "aws_ecr_repository" "backend-ecr" {
+  name                 = "${local.project_name}-api"
+  image_tag_mutability = "MUTABLE"
+
+  image_scanning_configuration {
+    scan_on_push = true # セキュリティスキャン有効
+  }
+
+  lifecycle {
+    prevent_destroy = true # 削除防止（イメージ保護）
+  }
+
+  tags = {
+    Name                   = "${local.project_name}-ecr-repo"
+    "${local.project_tag}" = local.project_name
+  }
+}
+
+# ECR Lifecycle Policy
+resource "aws_ecr_lifecycle_policy" "backend-ecr-lifecycle-policy" {
+  repository = aws_ecr_repository.backend-ecr.name
+
+  policy = jsonencode({
+    rules = [
+      {
+        rulePriority = 1
+        description  = "Keep last 5 images"
+        selection = {
+          tagStatus   = "any"
+          countType   = "imageCountMoreThan"
+          countNumber = 5
+        }
+        action = {
+          type = "expire"
+        }
+      }
+    ]
+  })
+}
