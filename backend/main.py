@@ -1,3 +1,4 @@
+from datetime import datetime
 from typing import Dict
 
 from fastapi import FastAPI
@@ -11,5 +12,5 @@ def hello_world() -> Dict[str, str]:
 
 
 @app.get("/health_check")
-def health_check() -> Dict[str, str]:
-    return {"status": "healthy"}
+def health_check() -> Dict[str, str | datetime]:
+    return {"status": "healthy", "timestamp": datetime.now()}
