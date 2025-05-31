@@ -413,6 +413,14 @@ resource "aws_vpc_security_group_egress_rule" "backend-api-sg-vpc-endpoint-egres
   cidr_ipv4         = local.cidr_block
 }
 
+resource "aws_vpc_security_group_egress_rule" "backend-api-sg-rds-egress" {
+  security_group_id            = aws_security_group.backend-api-sg.id
+  from_port                    = 3306
+  to_port                      = 3306
+  ip_protocol                  = "tcp"
+  referenced_security_group_id = aws_security_group.rds_sg.id
+}
+
 # ECR Repository
 resource "aws_ecr_repository" "backend-ecr" {
   name                 = "${local.project_name}-api"
@@ -667,6 +675,8 @@ resource "aws_iam_role_policy" "ecs_task_policy" {
 }
 
 # ECS Task Definition
+
+# ECS Task Definition
 resource "aws_ecs_task_definition" "backend-api" {
   family                   = "${local.project_name}-api"
   network_mode             = "awsvpc"
@@ -701,6 +711,30 @@ resource "aws_ecs_task_definition" "backend-api" {
         {
           name  = "LOG_LEVEL"
           value = "INFO"
+        },
+        {
+          name  = "DATABASE_URL"
+          value = "mysql://admin:${var.db_password}@${aws_db_instance.mysql.endpoint}:3306/appdb"
+        },
+        {
+          name  = "DB_HOST"
+          value = aws_db_instance.mysql.endpoint
+        },
+        {
+          name  = "DB_PORT"
+          value = "3306"
+        },
+        {
+          name  = "DB_NAME"
+          value = "appdb"
+        },
+        {
+          name  = "DB_USER"
+          value = "admin"
+        },
+        {
+          name  = "DB_PASSWORD"
+          value = var.db_password
         }
       ]
 
@@ -735,4 +769,107 @@ resource "aws_ecs_task_definition" "backend-api" {
     Name                   = "${local.project_name}-task-definition"
     "${local.project_tag}" = local.project_name
   }
+}
+
+# Database Subnet Group
+resource "aws_db_subnet_group" "main" {
+  name       = "${local.project_name}-db-subnet-group"
+  subnet_ids = aws_subnet.private-subnet[*].id
+
+  tags = {
+    Name                   = "${local.project_name}-db-subnet-group"
+    "${local.project_tag}" = local.project_name
+  }
+}
+
+# RDS Parameter Group (MySQL最適化)
+resource "aws_db_parameter_group" "mysql" {
+  family = "mysql8.0"
+  name   = "${local.project_name}-mysql-params"
+
+  parameter {
+    name  = "innodb_buffer_pool_size"
+    value = "{DBInstanceClassMemory*3/4}" # メモリの75%をバッファプールに
+  }
+
+  tags = {
+    Name                   = "${local.project_name}-mysql-params"
+    "${local.project_tag}" = local.project_name
+  }
+}
+
+# RDS Instance (MySQL)
+resource "aws_db_instance" "mysql" {
+  identifier        = "${local.project_name}-mysql"
+  allocated_storage = 20
+  storage_type      = "gp2"
+  engine            = "mysql"
+  engine_version    = "8.0"
+  instance_class    = "db.t3.micro" # 最小構成
+
+  # Database設定
+  db_name  = "appdb"
+  username = "admin"
+  password = var.db_password # variables.tfで定義
+
+  # ネットワーク設定
+  db_subnet_group_name   = aws_db_subnet_group.main.name
+  vpc_security_group_ids = [aws_security_group.rds_sg.id]
+
+  # 可用性設定（コスト削減）
+  multi_az            = false # Single-AZ（安価）
+  publicly_accessible = false # プライベート
+
+  # バックアップ設定（コスト削減）
+  backup_retention_period = 0    # バックアップ無効
+  backup_window           = null # バックアップ無効時は不要
+
+  # メンテナンス設定
+  maintenance_window = "sun:03:00-sun:04:00"
+
+  # 削除設定（開発用）
+  deletion_protection      = false # 削除可能
+  skip_final_snapshot      = true  # 最終スナップショット無効
+  delete_automated_backups = true  # 自動バックアップ削除
+
+  # パフォーマンス設定
+  parameter_group_name = aws_db_parameter_group.mysql.name
+
+  # 監視設定（コスト削減）
+  monitoring_interval = 0 # 拡張監視無効
+
+  tags = {
+    Name                   = "${local.project_name}-mysql"
+    "${local.project_tag}" = local.project_name
+  }
+}
+
+# RDS用Security Group
+resource "aws_security_group" "rds_sg" {
+  name        = "${local.project_name}-rds-sg"
+  description = "Security group for RDS MySQL"
+  vpc_id      = aws_vpc.main.id
+
+  tags = {
+    Name                   = "${local.project_name}-rds-sg"
+    "${local.project_tag}" = local.project_name
+  }
+}
+
+# ECSからRDSへのMySQL通信
+resource "aws_vpc_security_group_ingress_rule" "rds_mysql" {
+  security_group_id            = aws_security_group.rds_sg.id
+  from_port                    = 3306
+  to_port                      = 3306
+  ip_protocol                  = "tcp"
+  referenced_security_group_id = aws_security_group.backend-api-sg.id
+}
+
+# RDS用アウトバウンド（基本的に不要だが念のため）
+resource "aws_vpc_security_group_egress_rule" "rds_egress" {
+  security_group_id = aws_security_group.rds_sg.id
+  from_port         = 0
+  to_port           = 0
+  ip_protocol       = "-1"
+  cidr_ipv4         = "0.0.0.0/0"
 }
