@@ -12,6 +12,76 @@ provider "aws" {
   region = "ap-northeast-1"
 }
 
+# Route53
+resource "aws_route53_zone" "host-zone" {
+  name = var.domain_name
+
+  lifecycle {
+    prevent_destroy = true # 削除防止
+  }
+
+  tags = {
+    Name                   = "${local.project_name}-host-zone"
+    "${local.project_tag}" = local.project_name
+  }
+}
+
+# ALBへのAliasレコード
+resource "aws_route53_record" "alb" {
+  zone_id = aws_route53_zone.host-zone.id
+  name    = "${var.subdomain}.${var.domain_name}"
+  type    = "A"
+
+  alias {
+    name                   = aws_lb.alb.dns_name
+    zone_id                = aws_lb.alb.zone_id
+    evaluate_target_health = true
+  }
+}
+
+# ACM
+resource "aws_acm_certificate" "acm" {
+  domain_name       = "${var.subdomain}.${var.domain_name}"
+  validation_method = "DNS"
+
+  lifecycle {
+    create_before_destroy = true
+    prevent_destroy       = true # 削除防止
+  }
+
+  tags = {
+    Name                   = "${local.project_name}-acm-certificate"
+    "${local.project_tag}" = local.project_name
+  }
+}
+
+resource "aws_route53_record" "cert-validation" {
+  for_each = {
+    for dvo in aws_acm_certificate.acm.domain_validation_options : dvo.domain_name => {
+      name   = dvo.resource_record_name
+      record = dvo.resource_record_value
+      type   = dvo.resource_record_type
+    }
+  }
+
+  allow_overwrite = true
+  name            = each.value.name
+  records         = [each.value.record]
+  ttl             = 60
+  type            = each.value.type
+  zone_id         = aws_route53_zone.host-zone.id
+}
+
+# 証明書検証の完了待ち
+resource "aws_acm_certificate_validation" "main" {
+  certificate_arn         = aws_acm_certificate.acm.arn
+  validation_record_fqdns = [for record in aws_route53_record.cert-validation : record.fqdn]
+
+  timeouts {
+    create = "5m"
+  }
+}
+
 # VPC作成
 resource "aws_vpc" "main" {
   cidr_block           = local.cidr_block

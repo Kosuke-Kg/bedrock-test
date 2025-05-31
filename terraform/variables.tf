@@ -9,3 +9,15 @@ variable "enable_deletion_protection" {
   type        = bool
   default     = false
 }
+
+variable "domain_name" {
+  description = "Domain name for the application"
+  type        = string
+  default     = "example.com"
+}
+
+variable "subdomain" {
+  description = "Subdomain for the API"
+  type        = string
+  default     = "api"
+}
