@@ -18,7 +18,7 @@ RUN pip install uv
 WORKDIR /app
 
 # 依存関係ファイルをコピー
-COPY pyproject.toml ./
+COPY ./backend/pyproject.toml ./
 
 # 依存関係をインストール
 RUN uv sync --no-dev
@@ -49,8 +49,7 @@ WORKDIR /app
 COPY --from=builder /app/.venv /app/.venv
 
 # アプリケーションコードをコピー
-COPY main.py database.py models.py schemas.py ./
-
+COPY ./backend/main.py ./backend/database.py ./backend/models.py ./backend/schemas.py ./
 # ファイルの所有権を変更
 RUN chown -R appuser:appuser /app
 
