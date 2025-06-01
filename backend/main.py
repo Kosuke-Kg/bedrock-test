@@ -3,8 +3,11 @@ from typing import Dict, List
 
 from database import Base, engine, get_db
 from fastapi import Depends, FastAPI, HTTPException
-from models import Genre, Question
+from models import Answer, Genre, Question
 from schemas import (
+    AnswerCreate,
+    AnswerResponse,
+    AnswerWithQuestion,
     GenreCreate,
     GenreResponse,
     QuestionCreate,
@@ -174,3 +177,165 @@ async def get_questions_by_genre(
     questions = result.scalars().all()
 
     return list(questions)
+
+
+# ===== 回答関連エンドポイント =====
+@app.post("/answers", response_model=AnswerResponse, summary="回答作成")
+async def create_answer(
+    answer: AnswerCreate, db: AsyncSession = Depends(get_db)
+) -> AnswerResponse:
+    """
+    新しい回答を作成します。
+
+    - **question_id**: 関連する質問のID（UUID形式）
+    - **answer**: 回答内容
+    """
+    # 質問の存在確認
+    question_result = await db.execute(
+        select(Question).where(Question.id == answer.question_id)
+    )
+    if not question_result.scalar_one_or_none():
+        raise HTTPException(
+            status_code=404, detail=f"質問ID '{answer.question_id}' が見つかりません"
+        )
+
+    # 回答を作成
+    db_answer = Answer(**answer.model_dump())
+    db.add(db_answer)
+    await db.commit()
+    await db.refresh(db_answer)
+
+    return db_answer
+
+
+@app.get("/answers", response_model=List[AnswerWithQuestion], summary="回答一覧取得")
+async def get_answers(
+    question_id: str | None = None, db: AsyncSession = Depends(get_db)
+) -> List[AnswerWithQuestion]:
+    """
+    回答の一覧を取得します。
+
+    - **question_id**: 指定した場合、その質問の回答のみを取得
+    """
+    # クエリの構築
+    query = select(Answer).options(
+        selectinload(Answer.question).selectinload(Question.genre)
+    )
+
+    if question_id:
+        query = query.where(Answer.question_id == question_id)
+
+    result = await db.execute(query)
+    answers = result.scalars().all()
+
+    return list(answers)
+
+
+@app.get(
+    "/answers/{answer_id}", response_model=AnswerWithQuestion, summary="回答詳細取得"
+)
+async def get_answer(
+    answer_id: str, db: AsyncSession = Depends(get_db)
+) -> AnswerWithQuestion:
+    """
+    指定されたIDの回答詳細を取得します。
+
+    - **answer_id**: 回答のID（UUID形式）
+    """
+    result = await db.execute(
+        select(Answer)
+        .options(selectinload(Answer.question).selectinload(Question.genre))
+        .where(Answer.id == answer_id)
+    )
+    answer = result.scalar_one_or_none()
+
+    if not answer:
+        raise HTTPException(
+            status_code=404, detail=f"回答ID '{answer_id}' が見つかりません"
+        )
+
+    return answer
+
+
+@app.get(
+    "/questions/{question_id}/answers",
+    response_model=List[AnswerResponse],
+    summary="質問別回答取得",
+)
+async def get_answers_by_question(
+    question_id: str, db: AsyncSession = Depends(get_db)
+) -> List[AnswerResponse]:
+    """
+    指定された質問に対する回答の一覧を取得します。
+
+    - **question_id**: 質問のID（UUID形式）
+    """
+    # 質問の存在確認
+    question_result = await db.execute(
+        select(Question).where(Question.id == question_id)
+    )
+    if not question_result.scalar_one_or_none():
+        raise HTTPException(
+            status_code=404, detail=f"質問ID '{question_id}' が見つかりません"
+        )
+
+    # 回答を取得
+    result = await db.execute(select(Answer).where(Answer.question_id == question_id))
+    answers = result.scalars().all()
+
+    return list(answers)
+
+
+@app.get(
+    "/questions/{question_id}/details",
+    response_model=Dict,
+    summary="質問と回答の詳細取得",
+)
+async def get_question_with_answers(
+    question_id: str, db: AsyncSession = Depends(get_db)
+) -> Dict:
+    """
+    質問とその回答をまとめて取得します。
+
+    - **question_id**: 質問のID（UUID形式）
+    """
+    # 質問を取得（ジャンルと回答を含む）
+    question_result = await db.execute(
+        select(Question)
+        .options(selectinload(Question.genre), selectinload(Question.answers))
+        .where(Question.id == question_id)
+    )
+    question = question_result.scalar_one_or_none()
+
+    if not question:
+        raise HTTPException(
+            status_code=404, detail=f"質問ID '{question_id}' が見つかりません"
+        )
+
+    # レスポンス用のデータを構築
+    return {
+        "question": {
+            "id": question.id,
+            "question": question.question,
+            "genre_id": question.genre_id,
+            "created_at": question.created_at,
+            "updated_at": question.updated_at,
+            "genre": {
+                "id": question.genre.id,
+                "genre_name": question.genre.genre_name,
+                "created_at": question.genre.created_at,
+                "updated_at": question.genre.updated_at,
+            },
+        },
+        "answers": [
+            {
+                "id": answer.id,
+                "answer": answer.answer,
+                "question_id": answer.question_id,
+                "created_at": answer.created_at,
+                "updated_at": answer.updated_at,
+            }
+            for answer in question.answers
+        ],
+        "answer_count": len(question.answers),
+    }
