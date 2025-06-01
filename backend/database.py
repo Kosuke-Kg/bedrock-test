@@ -1,17 +1,24 @@
 import os
 
-from dotenv import load_dotenv
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 from sqlalchemy.orm import DeclarativeBase
 
-# 環境変数の読み込み
-load_dotenv()
+# 本番環境では.envファイルを読み込まない
+# 開発環境でのみdotenvを使用
+try:
+    from dotenv import load_dotenv
+
+    if os.getenv("ENVIRONMENT") != "production":
+        load_dotenv()
+except ImportError:
+    # dotenvがインストールされていない場合は無視
+    pass
 
 # データベース接続URL
 DATABASE_URL = f"mysql+aiomysql://{os.getenv('DB_USER')}:{os.getenv('DB_PASSWORD')}@{os.getenv('DB_HOST')}:{os.getenv('DB_PORT')}/{os.getenv('DB_NAME')}"
 
 # エンジンの作成
-engine = create_async_engine(DATABASE_URL, echo=True)
+engine = create_async_engine(DATABASE_URL, echo=False)  # 本番ではechoをFalseに
 
 # セッションの作成
 AsyncSessionLocal = async_sessionmaker(

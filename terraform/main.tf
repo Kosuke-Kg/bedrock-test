@@ -309,7 +309,7 @@ resource "aws_lb_listener" "alb-https-listener" {
   port              = "443"
   protocol          = "HTTPS"
   ssl_policy        = "ELBSecurityPolicy-TLS13-1-2-2021-06"
-  # certificate_arn   = aws_acm_certificate_validation.main.certificate_arn # FIXME: ACM証明書のARNを指定
+  certificate_arn   = aws_acm_certificate_validation.main.certificate_arn
 
   default_action {
     type             = "forward"
@@ -653,7 +653,7 @@ resource "aws_iam_role" "ecs_task_role" {
   }
 }
 
-# ECS Task Role Policy（最小権限 - 必要に応じて拡張）
+# ECS Task Execution Role Policy（最小権限 - 必要に応じて拡張）
 resource "aws_iam_role_policy" "ecs_task_policy" {
   name = "${local.project_name}-ecs-task-policy"
   role = aws_iam_role.ecs_task_role.id
@@ -669,6 +669,25 @@ resource "aws_iam_role_policy" "ecs_task_policy" {
           "logs:PutLogEvents"
         ]
         Resource = "arn:aws:logs:*:*:*"
+      }
+    ]
+  })
+}
+
+# Secrets Manager アクセス権限（Task Execution Role用）
+resource "aws_iam_role_policy" "ecs_secrets_policy" {
+  name = "${local.project_name}-ecs-secrets-policy"
+  role = aws_iam_role.ecs_task_execution_role.id
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect = "Allow"
+        Action = [
+          "secretsmanager:GetSecretValue"
+        ]
+        Resource = aws_secretsmanager_secret.db_credentials.arn
       }
     ]
   })
@@ -700,7 +719,7 @@ resource "aws_ecs_task_definition" "backend-api" {
       # 必須設定
       essential = true
 
-      # 環境変数
+      # 環境変数（非機密情報のみ）
       environment = [
         {
           name  = "ENV"
@@ -709,10 +728,6 @@ resource "aws_ecs_task_definition" "backend-api" {
         {
           name  = "LOG_LEVEL"
           value = "INFO"
-        },
-        {
-          name  = "DATABASE_URL"
-          value = "mysql://admin:${var.db_password}@${aws_db_instance.mysql.endpoint}:3306/appdb"
         },
         {
           name  = "DB_HOST"
@@ -729,10 +744,14 @@ resource "aws_ecs_task_definition" "backend-api" {
         {
           name  = "DB_USER"
           value = "admin"
-        },
+        }
+      ]
+
+      # 機密情報（Secrets Manager から取得）
+      secrets = [
         {
-          name  = "DB_PASSWORD"
-          value = var.db_password
+          name      = "DB_PASSWORD"
+          valueFrom = "${aws_secretsmanager_secret.db_credentials.arn}:password::"
         }
       ]
 
@@ -852,6 +871,30 @@ resource "aws_security_group" "rds_sg" {
     Name                   = "${local.project_name}-rds-sg"
     "${local.project_tag}" = local.project_name
   }
+}
+
+resource "aws_secretsmanager_secret" "db_credentials" {
+  name        = "${local.project_name}-db-credentials"
+  description = "Database credentials for ${local.project_name}"
+
+  tags = {
+    Name                   = "${local.project_name}-db-credentials"
+    "${local.project_tag}" = local.project_name
+  }
+}
+
+# Database Secrets Value
+resource "aws_secretsmanager_secret_version" "db_credentials" {
+  secret_id = aws_secretsmanager_secret.db_credentials.id
+  secret_string = jsonencode({
+    username             = "admin"
+    password             = var.db_password
+    engine               = "mysql"
+    host                 = aws_db_instance.mysql.endpoint
+    port                 = 3306
+    dbname               = "appdb"
+    dbInstanceIdentifier = aws_db_instance.mysql.id
+  })
 }
 
 # ECSからRDSへのMySQL通信
