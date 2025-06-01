@@ -19,7 +19,12 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 app = FastAPI(
-    title="Bedrock Test API", description="ジャンル・質問・回答管理API", version="0.1.0"
+    title="Bedrock Test API",
+    description="ジャンル・質問・回答管理API",
+    version="0.1.0",
+    docs_url="/docs",  # Swagger UI
+    redoc_url="/redoc",  # ReDoc
+    openapi_url="/openapi.json",  # OpenAPI JSON
 )
 
 

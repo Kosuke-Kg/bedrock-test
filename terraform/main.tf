@@ -13,74 +13,74 @@ provider "aws" {
 }
 
 # Route53
-resource "aws_route53_zone" "host-zone" {
-  name = var.domain_name
+# resource "aws_route53_zone" "host-zone" {
+#   name = var.domain_name
 
-  lifecycle {
-    prevent_destroy = true # 削除防止
-  }
+#   lifecycle {
+#     prevent_destroy = true # 削除防止
+#   }
 
-  tags = {
-    Name                   = "${local.project_name}-host-zone"
-    "${local.project_tag}" = local.project_name
-  }
-}
+#   tags = {
+#     Name                   = "${local.project_name}-host-zone"
+#     "${local.project_tag}" = local.project_name
+#   }
+# }
 
 # ALBへのAliasレコード
-resource "aws_route53_record" "alb" {
-  zone_id = aws_route53_zone.host-zone.id
-  name    = "${var.subdomain}.${var.domain_name}"
-  type    = "A"
+# resource "aws_route53_record" "alb" {
+#   zone_id = aws_route53_zone.host-zone.id
+#   name    = "${var.subdomain}.${var.domain_name}"
+#   type    = "A"
 
-  alias {
-    name                   = aws_lb.alb.dns_name
-    zone_id                = aws_lb.alb.zone_id
-    evaluate_target_health = true
-  }
-}
+#   alias {
+#     name                   = aws_lb.alb.dns_name
+#     zone_id                = aws_lb.alb.zone_id
+#     evaluate_target_health = true
+#   }
+# }
+
+# resource "aws_route53_record" "cert-validation" {
+#   for_each = {
+#     for dvo in aws_acm_certificate.acm.domain_validation_options : dvo.domain_name => {
+#       name   = dvo.resource_record_name
+#       record = dvo.resource_record_value
+#       type   = dvo.resource_record_type
+#     }
+#   }
+
+#   allow_overwrite = true
+#   name            = each.value.name
+#   records         = [each.value.record]
+#   ttl             = 60
+#   type            = each.value.type
+#   zone_id         = aws_route53_zone.host-zone.id
+# }
 
 # ACM
-resource "aws_acm_certificate" "acm" {
-  domain_name       = "${var.subdomain}.${var.domain_name}"
-  validation_method = "DNS"
+# resource "aws_acm_certificate" "acm" {
+#   domain_name       = "${var.subdomain}.${var.domain_name}"
+#   validation_method = "DNS"
 
-  lifecycle {
-    create_before_destroy = true
-    prevent_destroy       = true # 削除防止
-  }
+#   lifecycle {
+#     create_before_destroy = true
+#     prevent_destroy       = true # 削除防止
+#   }
 
-  tags = {
-    Name                   = "${local.project_name}-acm-certificate"
-    "${local.project_tag}" = local.project_name
-  }
-}
-
-resource "aws_route53_record" "cert-validation" {
-  for_each = {
-    for dvo in aws_acm_certificate.acm.domain_validation_options : dvo.domain_name => {
-      name   = dvo.resource_record_name
-      record = dvo.resource_record_value
-      type   = dvo.resource_record_type
-    }
-  }
-
-  allow_overwrite = true
-  name            = each.value.name
-  records         = [each.value.record]
-  ttl             = 60
-  type            = each.value.type
-  zone_id         = aws_route53_zone.host-zone.id
-}
+#   tags = {
+#     Name                   = "${local.project_name}-acm-certificate"
+#     "${local.project_tag}" = local.project_name
+#   }
+# }
 
 # 証明書検証の完了待ち
-resource "aws_acm_certificate_validation" "main" {
-  certificate_arn         = aws_acm_certificate.acm.arn
-  validation_record_fqdns = [for record in aws_route53_record.cert-validation : record.fqdn]
+# resource "aws_acm_certificate_validation" "main" {
+#   certificate_arn         = aws_acm_certificate.acm.arn
+#   validation_record_fqdns = [for record in aws_route53_record.cert-validation : record.fqdn]
 
-  timeouts {
-    create = "5m"
-  }
-}
+#   timeouts {
+#     create = "5m"
+#   }
+# }
 
 # VPC作成
 resource "aws_vpc" "main" {
@@ -237,6 +237,21 @@ resource "aws_vpc_endpoint" "s3" {
   }
 }
 
+resource "aws_vpc_endpoint" "secretsmanager" {
+  vpc_id             = aws_vpc.main.id
+  service_name       = "com.amazonaws.ap-northeast-1.secretsmanager"
+  vpc_endpoint_type  = "Interface"
+  subnet_ids         = aws_subnet.private-subnet[*].id
+  security_group_ids = [aws_security_group.vpc_endpoint_sg.id]
+
+  private_dns_enabled = true
+
+  tags = {
+    Name                   = "${local.project_name}-secretsmanager-endpoint"
+    "${local.project_tag}" = local.project_name
+  }
+}
+
 # VPCエンドポイント用Security Group
 resource "aws_security_group" "vpc_endpoint_sg" {
   name        = "${local.project_name}-vpc-endpoint-sg"
@@ -261,8 +276,6 @@ resource "aws_vpc_security_group_ingress_rule" "vpc_endpoint_https" {
 # VPCエンドポイント用アウトバウンド（全許可）
 resource "aws_vpc_security_group_egress_rule" "vpc_endpoint_egress" {
   security_group_id = aws_security_group.vpc_endpoint_sg.id
-  from_port         = 0
-  to_port           = 0
   ip_protocol       = "-1"
   cidr_ipv4         = "0.0.0.0/0"
 }
@@ -283,19 +296,35 @@ resource "aws_lb" "alb" {
 }
 
 # ALBリスナー
+# resource "aws_lb_listener" "alb-http-listener" {
+#   load_balancer_arn = aws_lb.alb.arn
+#   port              = 80
+#   protocol          = "HTTP"
+
+#   default_action {
+#     type = "redirect"
+
+#     redirect {
+#       port        = "443"
+#       protocol    = "HTTPS"
+#       status_code = "HTTP_301"
+#     }
+#   }
+
+#   tags = {
+#     Name                   = "${local.project_name}-alb-listener"
+#     "${local.project_tag}" = local.project_name
+#   }
+# }
+
 resource "aws_lb_listener" "alb-http-listener" {
   load_balancer_arn = aws_lb.alb.arn
   port              = 80
   protocol          = "HTTP"
 
   default_action {
-    type = "redirect"
-
-    redirect {
-      port        = "443"
-      protocol    = "HTTPS"
-      status_code = "HTTP_301"
-    }
+    type             = "forward" # redirect → forward に変更
+    target_group_arn = aws_lb_target_group.ecs.arn
   }
 
   tags = {
@@ -304,23 +333,23 @@ resource "aws_lb_listener" "alb-http-listener" {
   }
 }
 
-resource "aws_lb_listener" "alb-https-listener" {
-  load_balancer_arn = aws_lb.alb.arn
-  port              = "443"
-  protocol          = "HTTPS"
-  ssl_policy        = "ELBSecurityPolicy-TLS13-1-2-2021-06"
-  certificate_arn   = aws_acm_certificate_validation.main.certificate_arn
+# resource "aws_lb_listener" "alb-https-listener" {
+#   load_balancer_arn = aws_lb.alb.arn
+#   port              = "443"
+#   protocol          = "HTTPS"
+#   ssl_policy        = "ELBSecurityPolicy-TLS13-1-2-2021-06"
+#   certificate_arn   = aws_acm_certificate_validation.main.certificate_arn
 
-  default_action {
-    type             = "forward"
-    target_group_arn = aws_lb_target_group.ecs.arn
-  }
+#   default_action {
+#     type             = "forward"
+#     target_group_arn = aws_lb_target_group.ecs.arn
+#   }
 
-  tags = {
-    Name                   = "${local.project_name}-alb-https-listener"
-    "${local.project_tag}" = local.project_name
-  }
-}
+#   tags = {
+#     Name                   = "${local.project_name}-alb-https-listener"
+#     "${local.project_tag}" = local.project_name
+#   }
+# }
 
 # ALB Target Group
 resource "aws_lb_target_group" "ecs" {
@@ -397,6 +426,16 @@ resource "aws_security_group" "backend-api-sg" {
   }
 }
 
+# ECSタスク用セキュリティグループにアウトバウンドルールを追加
+resource "aws_vpc_security_group_egress_rule" "ecs_task_https_egress" {
+  security_group_id = aws_security_group.backend-api-sg.id
+  from_port         = 443
+  to_port           = 443
+  ip_protocol       = "tcp"
+  cidr_ipv4         = "0.0.0.0/0"
+  description       = "Allow HTTPS outbound for ECR access"
+}
+
 resource "aws_vpc_security_group_ingress_rule" "backend-api-sg-ingress" {
   security_group_id            = aws_security_group.backend-api-sg.id
   from_port                    = 8000
@@ -438,6 +477,38 @@ resource "aws_ecr_repository" "backend-ecr" {
     Name                   = "${local.project_name}-ecr-repo"
     "${local.project_tag}" = local.project_name
   }
+}
+
+resource "aws_ecr_repository_policy" "backend-ecr-policy" {
+  repository = aws_ecr_repository.backend-ecr.name
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Sid    = "AllowECSTaskAccess"
+        Effect = "Allow"
+        Principal = {
+          AWS = aws_iam_role.ecs_task_execution_role.arn
+        }
+        Action = [
+          "ecr:BatchCheckLayerAvailability",
+          "ecr:GetDownloadUrlForLayer",
+          "ecr:BatchGetImage"
+        ]
+      },
+      {
+        Sid    = "AllowECSGetAuthorizationToken"
+        Effect = "Allow"
+        Principal = {
+          AWS = aws_iam_role.ecs_task_execution_role.arn
+        }
+        Action = [
+          "ecr:GetAuthorizationToken"
+        ]
+      }
+    ]
+  })
 }
 
 # ECR Lifecycle Policy
@@ -484,13 +555,8 @@ resource "aws_ecs_service" "backend-api" {
     container_port   = 8000
   }
 
-  # Auto Scaling対応
-  lifecycle {
-    ignore_changes = [desired_count]
-  }
-
-  # Load Balancerヘルスチェック待ち
-  depends_on = [aws_lb_listener.alb-https-listener]
+  # 依存関係をHTTPに変更
+  depends_on = [aws_lb_listener.alb-http-listener] # HTTPS → HTTP
 
   tags = {
     Name                   = "${local.project_name}-ecs-service"
@@ -607,6 +673,26 @@ resource "aws_iam_role_policy_attachment" "ecs_task_execution_role_policy" {
   role       = aws_iam_role.ecs_task_execution_role.name
   policy_arn = "arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy"
 }
+
+# ECR認証トークン取得のための追加ポリシー
+resource "aws_iam_role_policy" "ecr_authorization_token" {
+  name = "${local.project_name}-ecr-authorization-token"
+  role = aws_iam_role.ecs_task_execution_role.id
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect = "Allow"
+        Action = [
+          "ecr:GetAuthorizationToken"
+        ]
+        Resource = "*"
+      }
+    ]
+  })
+}
+
 
 # ECR追加権限（VPCエンドポイント使用時）
 resource "aws_iam_role_policy" "ecs_task_execution_ecr_policy" {
@@ -731,7 +817,7 @@ resource "aws_ecs_task_definition" "backend-api" {
         },
         {
           name  = "DB_HOST"
-          value = aws_db_instance.mysql.endpoint
+          value = aws_db_instance.mysql.address
         },
         {
           name  = "DB_PORT"
@@ -909,8 +995,7 @@ resource "aws_vpc_security_group_ingress_rule" "rds_mysql" {
 # RDS用アウトバウンド（基本的に不要だが念のため）
 resource "aws_vpc_security_group_egress_rule" "rds_egress" {
   security_group_id = aws_security_group.rds_sg.id
-  from_port         = 0
-  to_port           = 0
   ip_protocol       = "-1"
   cidr_ipv4         = "0.0.0.0/0"
 }
+

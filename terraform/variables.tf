@@ -13,7 +13,7 @@ variable "enable_deletion_protection" {
 variable "domain_name" {
   description = "Domain name for the application"
   type        = string
-  default     = "example.com"
+  default     = "small-kg.link"
 }
 
 variable "subdomain" {
