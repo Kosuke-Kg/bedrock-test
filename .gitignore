@@ -36,5 +36,11 @@ override.tf.json
 .terraformrc
 terraform.rc
 
+.terraform.lock.hcl
+
 .venv
 __pycache__
+.env
+.mypy_cache
+.ruff_cache
+.pytest_cache
