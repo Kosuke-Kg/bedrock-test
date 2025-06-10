@@ -15,15 +15,11 @@ mise settings add idiomatic_version_file_enable_tools python
 
 ### 2. Pythonの依存関係のインストール
 
-pythonの依存関係のインストール
+Python の依存関係のインストールと仮想環境の有効化は
+`backend` ディレクトリで実行します。
 
 ```bash
 cd backend
 uv sync
-```
-
-pythonの仮想環境実行
-
-```bash
-. ./.venv/bin/activate
+. .venv/bin/activate
 ```
