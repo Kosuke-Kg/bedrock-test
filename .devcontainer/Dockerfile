@@ -22,7 +22,6 @@ RUN apt-get update && apt-get install -y \
     jq \
     tree \
     htop \
-    tree \
     && rm -rf /var/lib/apt/lists/*
 
 # 開発用ユーザーの作成（UID 1001を使用）
